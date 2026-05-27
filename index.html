@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Role Camera Action! - Video Platform</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Montserrat:wght@400;500;600;700&family=Open+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="dashboard.css">
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="header-left">
+            <button class="menu-toggle" id="menuToggle">
+                <i class="fas fa-bars"></i>
+            </button>
+            <a href="#" class="logo">
+                <span class="logo-icon"><i class="fas fa-film"></i></span>
+                <span class="logo-text">ROLE CAMERA ACTION!</span>
+            </a>
+        </div>
+        
+        <div class="header-center">
+            <div class="search-container">
+                <input type="text" class="search-input" id="searchInput" placeholder="Search videos...">
+                <button class="search-btn" id="searchBtn">
+                    <i class="fas fa-search"></i>
+                </button>
+            </div>
+        </div>
+        
+        <div class="header-right">
+            <button class="upload-btn" id="uploadBtn">
+                <i class="fas fa-upload"></i>
+                <span>Upload</span>
+            </button>
+
+            <div class="notif-bell-wrap header-notif" id="headerNotifWrap" style="display:none">
+                <button class="notif-bell-btn" id="notifBellBtn" title="Notifications">
+                    <i class="fas fa-bell"></i>
+                    <span class="notif-badge" id="notifBadge" style="display:none">0</span>
+                </button>
+                <div class="notif-panel" id="notifPanel"></div>
+            </div>
+            
+            <!-- User Menu (when logged in) -->
+            <div class="user-menu" id="userMenu" style="display: none;">
+                <button class="user-menu-trigger" id="userMenuTrigger">
+                    <img src="https://i.pravatar.cc/150?img=68" alt="User" id="userAvatarImg">
+                    <span class="user-name" id="userName">User</span>
+                    <i class="fas fa-chevron-down"></i>
+                </button>
+                <div class="user-dropdown" id="userDropdown">
+                    <a href="#" class="dropdown-item" id="myVideosBtn">
+                        <i class="fas fa-video"></i>
+                        <span>My Videos</span>
+                    </a>
+                    <a href="#" class="dropdown-item" id="likedVideosBtn">
+                        <i class="fas fa-heart"></i>
+                        <span>Liked Videos</span>
+                    </a>
+                    <a href="#" class="dropdown-item" id="subscriptionsBtn">
+                        <i class="fas fa-user-plus"></i>
+                        <span>Subscriptions</span>
+                    </a>
+                    <a href="#" class="dropdown-item" id="studioBtn">
+                        <i class="fas fa-sliders-h"></i>
+                        <span>Creator Studio</span>
+                    </a>
+                    <a href="#" class="dropdown-item" id="modBtn" style="display:none">
+                        <i class="fas fa-gavel"></i>
+                        <span>Moderation</span>
+                    </a>
+                    <a href="#" class="dropdown-item" id="adminLink" style="display:none">
+                        <i class="fas fa-shield-alt"></i>
+                        <span>Platform Admin</span>
+                    </a>
+                    <hr class="dropdown-divider">
+                    <a href="#" class="dropdown-item logout-item" id="logoutBtn">
+                        <i class="fas fa-sign-out-alt"></i>
+                        <span>Sign Out</span>
+                    </a>
+                </div>
+            </div>
+            
+            <!-- Sign In Button (when logged out) -->
+            <button class="signin-btn" id="signInBtn">
+                <i class="fas fa-user"></i>
+                <span>Sign In</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- Sidebar -->
+    <aside class="sidebar" id="sidebar">
+        <nav class="sidebar-nav">
+            <a href="#" class="nav-item active" data-genre="all">
+                <i class="fas fa-th-large"></i>
+                <span>All Videos</span>
+            </a>
+            <a href="#" class="nav-item" data-genre="drama">
+                <i class="fas fa-theater-masks"></i>
+                <span>Drama</span>
+            </a>
+            <a href="#" class="nav-item" data-genre="comedy">
+                <i class="fas fa-laugh-beam"></i>
+                <span>Comedy</span>
+            </a>
+            <a href="#" class="nav-item" data-genre="action">
+                <i class="fas fa-explosion"></i>
+                <span>Action</span>
+            </a>
+            <a href="#" class="nav-item" data-genre="romance">
+                <i class="fas fa-heart"></i>
+                <span>Romance</span>
+            </a>
+            <a href="#" class="nav-item" data-genre="horror">
+                <i class="fas fa-skull"></i>
+                <span>Horror</span>
+            </a>
+            <a href="#" class="nav-item" data-genre="documentary">
+                <i class="fas fa-video"></i>
+                <span>Documentary</span>
+            </a>
+            <a href="#" class="nav-item" data-genre="auditions">
+                <i class="fas fa-microphone"></i>
+                <span>Auditions</span>
+            </a>
+            <div class="sidebar-divider logged-tools" id="toolsSection" style="display:none"></div>
+            <span class="sidebar-label logged-tools" id="toolsLabel" style="display:none">Your Tools</span>
+            <a href="#" class="nav-item tool-nav logged-tools" data-app="studio" id="sidebarStudio" style="display:none">
+                <i class="fas fa-sliders-h"></i>
+                <span>Creator Studio</span>
+            </a>
+            <a href="#" class="nav-item tool-nav" data-app="mod" id="sidebarMod" style="display:none">
+                <i class="fas fa-gavel"></i>
+                <span>Moderation</span>
+            </a>
+            <a href="#" class="nav-item tool-nav" data-app="admin" id="sidebarAdmin" style="display:none">
+                <i class="fas fa-shield-alt"></i>
+                <span>Platform Admin</span>
+            </a>
+        </nav>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <div id="homeView">
+        <!-- Hero Section -->
+        <section class="hero-section" id="heroSection">
+            <div class="hero-content">
+                <h1>Welcome to Role Camera Action!</h1>
+                <p>Discover amazing short films, performances, and auditions from talented actors worldwide</p>
+            </div>
+            <div class="hero-stats">
+                <div class="stat">
+                    <span class="stat-number" id="totalVideos">0</span>
+                    <span class="stat-label">Videos</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-number">50K+</span>
+                    <span class="stat-label">Views</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-number">1K+</span>
+                    <span class="stat-label">Creators</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- Filter Bar -->
+        <div class="filter-bar">
+            <h2 class="section-title" id="sectionTitle">All Videos</h2>
+            <div class="filter-options">
+                <button class="filter-btn active" data-sort="newest">Newest</button>
+                <button class="filter-btn" data-sort="popular">Popular</button>
+                <button class="filter-btn" data-sort="trending">Trending</button>
+            </div>
+        </div>
+
+        <!-- Video Grid -->
+        <div class="video-grid" id="videoGrid">
+            <!-- Videos will be dynamically inserted here -->
+        </div>
+
+        <!-- Empty State -->
+        <div class="empty-state" id="emptyState" style="display: none;">
+            <i class="fas fa-video-slash"></i>
+            <h3>No videos found</h3>
+            <p>Try adjusting your search or filters</p>
+        </div>
+        </div>
+
+        <!-- Unified Dashboard (sign-in required) -->
+        <div id="dashboardView" class="dash-embedded" style="display:none">
+            <div class="dash-embedded-header">
+                <button type="button" class="dash-btn secondary" id="backToHome">
+                    <i class="fas fa-arrow-left"></i> Back to Home
+                </button>
+                <h2 id="dashViewTitle">Dashboard</h2>
+            </div>
+            <div class="dash-layout dash-embedded-layout">
+                <aside class="dash-sidebar" id="dashSidebar"></aside>
+                <div class="dash-main" id="dashMainContent"></div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Video Player Modal -->
+    <div class="video-modal" id="videoModal">
+        <div class="video-modal-content">
+            <button class="modal-close" id="modalClose">
+                <i class="fas fa-times"></i>
+            </button>
+            <div class="video-container">
+                <video id="videoPlayer" controls>
+                    <source src="" type="video/mp4">
+                    Your browser does not support the video tag.
+                </video>
+            </div>
+            <div class="video-info">
+                <h1 class="video-title" id="modalTitle">Video Title</h1>
+                <div class="video-meta">
+                    <span class="video-views" id="modalViews">0 views</span>
+                    <span class="video-date" id="modalDate">• 0 days ago</span>
+                </div>
+                <div class="video-actions">
+                    <button class="action-btn like-btn" id="likeBtn">
+                        <i class="fas fa-thumbs-up"></i>
+                        <span id="likeCount">0</span>
+                    </button>
+                    <button class="action-btn dislike-btn" id="dislikeBtn">
+                        <i class="fas fa-thumbs-down"></i>
+                    </button>
+                    <button class="action-btn share-btn">
+                        <i class="fas fa-share"></i>
+                        <span>Share</span>
+                    </button>
+                </div>
+                <div class="channel-info">
+                    <div class="channel-avatar">
+                        <img src="https://i.pravatar.cc/150?img=1" alt="Channel" id="modalChannelImg">
+                    </div>
+                    <div class="channel-details">
+                        <h3 class="channel-name" id="modalChannel">Channel Name</h3>
+                        <p class="channel-subs" id="modalChannelSubs">0 subscribers</p>
+                    </div>
+                    <button class="subscribe-btn" id="subscribeBtn">Subscribe</button>
+                    <button class="sub-notif-btn" id="subNotifBtn" title="Channel notifications" style="display:none">
+                        <i class="fas fa-bell"></i>
+                    </button>
+                </div>
+                <div class="video-description" id="modalDescription">
+                    Video description goes here...
+                </div>
+                <div class="comments-section">
+                    <h3>Comments <span id="commentCount">0</span></h3>
+                    <form id="commentForm" class="comment-form" style="display:none">
+                        <input type="text" id="commentInput" placeholder="Add a comment..." maxlength="2000">
+                        <button type="submit" class="submit-btn small">Post</button>
+                    </form>
+                    <p id="commentLoginHint" class="comment-hint">Sign in to comment</p>
+                    <div id="commentsList" class="comments-list"></div>
+                </div>
+            </div>
+            
+            <!-- Related Videos -->
+            <div class="related-videos">
+                <h3>Related Videos</h3>
+                <div class="related-list" id="relatedList">
+                    <!-- Related videos will be inserted here -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Upload Modal -->
+    <div class="upload-modal" id="uploadModal">
+        <div class="upload-modal-content">
+            <button class="modal-close" id="uploadModalClose">
+                <i class="fas fa-times"></i>
+            </button>
+            <h2>Upload Video</h2>
+            <form id="uploadForm">
+                <div class="upload-zone" id="uploadZone">
+                    <i class="fas fa-cloud-upload-alt"></i>
+                    <p>Drag and drop your video here</p>
+                    <span>or</span>
+                    <button type="button" class="browse-btn">Browse Files</button>
+                    <input type="file" id="videoFile" accept="video/*" hidden>
+                </div>
+                <div class="form-group">
+                    <label for="videoTitle">Title</label>
+                    <input type="text" id="videoTitle" placeholder="Enter video title" required>
+                </div>
+                <div class="form-group">
+                    <label for="videoDescription">Description</label>
+                    <textarea id="videoDescription" placeholder="Describe your video" rows="4"></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="videoGenre">Genre</label>
+                    <select id="videoGenre" required>
+                        <option value="">Select a genre</option>
+                        <option value="drama">Drama</option>
+                        <option value="comedy">Comedy</option>
+                        <option value="action">Action</option>
+                        <option value="romance">Romance</option>
+                        <option value="horror">Horror</option>
+                        <option value="documentary">Documentary</option>
+                        <option value="auditions">Auditions</option>
+                    </select>
+                </div>
+                <div class="upload-progress" id="uploadProgress" style="display: none;">
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="progressFill"></div>
+                    </div>
+                    <span class="progress-text" id="progressText">Uploading... 0%</span>
+                </div>
+                <button type="submit" class="submit-btn">Upload Video</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Sign In Modal -->
+    <div class="auth-modal" id="signInModal">
+        <div class="auth-modal-content">
+            <button class="modal-close auth-close" id="signInModalClose">
+                <i class="fas fa-times"></i>
+            </button>
+            <div class="auth-header">
+                <i class="fas fa-film auth-logo"></i>
+                <h2>Welcome Back</h2>
+                <p>Sign in to continue to Role Camera Action!</p>
+            </div>
+            <form id="signInForm">
+                <div class="form-group">
+                    <label for="signInEmail">Email</label>
+                    <input type="email" id="signInEmail" placeholder="Enter your email" required>
+                    <span class="form-error" id="signInEmailError"></span>
+                </div>
+                <div class="form-group">
+                    <label for="signInPassword">Password</label>
+                    <input type="password" id="signInPassword" placeholder="Enter your password" required>
+                    <span class="form-error" id="signInPasswordError"></span>
+                </div>
+                <div class="form-group remember-me">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="rememberMe">
+                        <span class="checkmark"></span>
+                        Remember me
+                    </label>
+                    <a href="#" class="forgot-password">Forgot password?</a>
+                </div>
+                <button type="submit" class="submit-btn" id="signInSubmit">
+                    <span class="btn-text">Sign In</span>
+                    <span class="btn-loading"><i class="fas fa-spinner fa-spin"></i></span>
+                </button>
+            </form>
+            <div class="auth-divider"><span>or</span></div>
+            <div id="googleSignInBtn" class="google-btn-container"></div>
+            <p class="google-hint" id="googleHint"></p>
+            <div class="auth-footer">
+                <p>Don't have an account? <a href="#" id="showSignUp">Sign up</a></p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sign Up Modal -->
+    <div class="auth-modal" id="signUpModal">
+        <div class="auth-modal-content">
+            <button class="modal-close auth-close" id="signUpModalClose">
+                <i class="fas fa-times"></i>
+            </button>
+            <div class="auth-header">
+                <i class="fas fa-film auth-logo"></i>
+                <h2>Create Account</h2>
+                <p>Join Role Camera Action! and start sharing</p>
+            </div>
+            <form id="signUpForm">
+                <div class="form-group">
+                    <label for="signUpUsername">Username</label>
+                    <input type="text" id="signUpUsername" placeholder="Choose a username" required>
+                    <span class="form-error" id="signUpUsernameError"></span>
+                </div>
+                <div class="form-group">
+                    <label for="signUpEmail">Email</label>
+                    <input type="email" id="signUpEmail" placeholder="Enter your email" required>
+                    <span class="form-error" id="signUpEmailError"></span>
+                </div>
+                <div class="form-group">
+                    <label for="signUpPassword">Password</label>
+                    <input type="password" id="signUpPassword" placeholder="Create a password" required>
+                    <span class="password-strength" id="passwordStrength"></span>
+                    <span class="form-error" id="signUpPasswordError"></span>
+                </div>
+                <div class="form-group">
+                    <label for="signUpConfirmPassword">Confirm Password</label>
+                    <input type="password" id="signUpConfirmPassword" placeholder="Confirm your password" required>
+                    <span class="form-error" id="signUpConfirmError"></span>
+                </div>
+                <div class="form-group terms-checkbox">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="agreeTerms" required>
+                        <span class="checkmark"></span>
+                        I agree to the <a href="#">Terms of Service</a> and <a href="#">Privacy Policy</a>
+                    </label>
+                </div>
+                <button type="submit" class="submit-btn" id="signUpSubmit">
+                    <span class="btn-text">Create Account</span>
+                    <span class="btn-loading"><i class="fas fa-spinner fa-spin"></i></span>
+                </button>
+            </form>
+            <div class="auth-divider"><span>or</span></div>
+            <div id="googleSignUpBtn" class="google-btn-container"></div>
+            <div class="auth-footer">
+                <p>Already have an account? <a href="#" id="showSignIn">Sign in</a></p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Auth Required Modal -->
+    <div class="auth-required-modal" id="authRequiredModal">
+        <div class="auth-required-content">
+            <i class="fas fa-lock"></i>
+            <h3>Authentication Required</h3>
+            <p id="authRequiredMessage">Please sign in to perform this action.</p>
+            <div class="auth-required-actions">
+                <button class="submit-btn" id="authRequiredSignIn">Sign In</button>
+                <button class="secondary-btn" id="authRequiredSignUp">Create Account</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Mobile Menu -->
+    <div class="mobile-menu" id="mobileMenu">
+        <button class="mobile-close" id="mobileClose">
+            <i class="fas fa-times"></i>
+        </button>
+        <nav class="mobile-nav">
+            <a href="#" class="nav-item active" data-genre="all">
+                <i class="fas fa-th-large"></i>
+                <span>All Videos</span>
+            </a>
+            <a href="#" class="nav-item" data-genre="drama">
+                <i class="fas fa-theater-masks"></i>
+                <span>Drama</span>
+            </a>
+            <a href="#" class="nav-item" data-genre="comedy">
+                <i class="fas fa-laugh-beam"></i>
+                <span>Comedy</span>
+            </a>
+            <a href="#" class="nav-item" data-genre="action">
+                <i class="fas fa-explosion"></i>
+                <span>Action</span>
+            </a>
+            <a href="#" class="nav-item" data-genre="romance">
+                <i class="fas fa-heart"></i>
+                <span>Romance</span>
+            </a>
+            <a href="#" class="nav-item" data-genre="horror">
+                <i class="fas fa-skull"></i>
+                <span>Horror</span>
+            </a>
+            <a href="#" class="nav-item" data-genre="documentary">
+                <i class="fas fa-video"></i>
+                <span>Documentary</span>
+            </a>
+            <a href="#" class="nav-item" data-genre="auditions">
+                <i class="fas fa-microphone"></i>
+                <span>Auditions</span>
+            </a>
+        </nav>
+    </div>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="footer-content">
+            <div class="footer-logo">
+                <i class="fas fa-film"></i>
+                <span>ROLE CAMERA ACTION!</span>
+            </div>
+            <p>&copy; 2024 Role Camera Action! All rights reserved.</p>
+            <div class="footer-links">
+                <a href="#">About</a>
+                <a href="#">Terms</a>
+                <a href="#">Privacy</a>
+                <a href="#">Contact</a>
+            </div>
+        </div>
+    </footer>
+
+<script src="js/shared.js"></script>
+    <script src="js/dashboards.js"></script>
+    <script src="app.js"></script>
+    <script src="_debug_check_buttons.js"></script>
+</body>
+</html>
+
