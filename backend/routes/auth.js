@@ -108,12 +108,16 @@ router.post('/google', async (req, res) => {
     if (!credential) {
       return res.status(400).json({ success: false, error: 'Google credential required' });
     }
+
+    // Make Google sign-in optional: if not configured, clearly reject
+    // without breaking normal email/password sign-in.
     if (!process.env.GOOGLE_CLIENT_ID) {
-      return res.status(503).json({
+      return res.status(501).json({
         success: false,
-        error: 'Google Sign-In is not configured. Add GOOGLE_CLIENT_ID to backend/.env'
+        error: 'Google Sign-In is disabled. Configure GOOGLE_CLIENT_ID to enable it.'
       });
     }
+
 
     const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
     const ticket = await client.verifyIdToken({

@@ -10,6 +10,8 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="styles.css">
     <link rel="stylesheet" href="dashboard.css">
+    <link rel="stylesheet" href="features.css">
+    <link rel="stylesheet" href="responsive.css">
     <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
@@ -55,6 +57,7 @@
                     <span class="user-name" id="userName">User</span>
                     <i class="fas fa-chevron-down"></i>
                 </button>
+                
                 <div class="user-dropdown" id="userDropdown">
                     <a href="#" class="dropdown-item" id="myVideosBtn">
                         <i class="fas fa-video"></i>
@@ -63,6 +66,10 @@
                     <a href="#" class="dropdown-item" id="likedVideosBtn">
                         <i class="fas fa-heart"></i>
                         <span>Liked Videos</span>
+                    </a>
+                    <a href="#" class="dropdown-item" id="watchLaterMenuBtn">
+                        <i class="fas fa-clock"></i>
+                        <span>Watch Later</span>
                     </a>
                     <a href="#" class="dropdown-item" id="subscriptionsBtn">
                         <i class="fas fa-user-plus"></i>
@@ -148,6 +155,9 @@
         </nav>
     </aside>
 
+    <!-- Sidebar Overlay (closes sidebar on mobile tap) -->
+    <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
     <!-- Main Content -->
     <main class="main-content">
         <div id="homeView">
@@ -180,6 +190,10 @@
                 <button class="filter-btn active" data-sort="newest">Newest</button>
                 <button class="filter-btn" data-sort="popular">Popular</button>
                 <button class="filter-btn" data-sort="trending">Trending</button>
+                <button class="filter-btn filter-reset-btn" id="resetFiltersBtn" type="button">
+                    <i class="fas fa-rotate-left"></i>
+                    <span>Reset</span>
+                </button>
             </div>
         </div>
 
@@ -188,11 +202,24 @@
             <!-- Videos will be dynamically inserted here -->
         </div>
 
+        <!-- Skeleton Loader -->
+        <div class="video-grid skeleton-grid" id="skeletonGrid" style="display:none">
+            <div class="skeleton-card"><div class="skeleton-thumb"></div><div class="skeleton-body"><div class="skeleton-line w80"></div><div class="skeleton-line w60"></div><div class="skeleton-line w40"></div></div></div>
+            <div class="skeleton-card"><div class="skeleton-thumb"></div><div class="skeleton-body"><div class="skeleton-line w80"></div><div class="skeleton-line w60"></div><div class="skeleton-line w40"></div></div></div>
+            <div class="skeleton-card"><div class="skeleton-thumb"></div><div class="skeleton-body"><div class="skeleton-line w80"></div><div class="skeleton-line w60"></div><div class="skeleton-line w40"></div></div></div>
+            <div class="skeleton-card"><div class="skeleton-thumb"></div><div class="skeleton-body"><div class="skeleton-line w80"></div><div class="skeleton-line w60"></div><div class="skeleton-line w40"></div></div></div>
+            <div class="skeleton-card"><div class="skeleton-thumb"></div><div class="skeleton-body"><div class="skeleton-line w80"></div><div class="skeleton-line w60"></div><div class="skeleton-line w40"></div></div></div>
+            <div class="skeleton-card"><div class="skeleton-thumb"></div><div class="skeleton-body"><div class="skeleton-line w80"></div><div class="skeleton-line w60"></div><div class="skeleton-line w40"></div></div></div>
+            <div class="skeleton-card"><div class="skeleton-thumb"></div><div class="skeleton-body"><div class="skeleton-line w80"></div><div class="skeleton-line w60"></div><div class="skeleton-line w40"></div></div></div>
+            <div class="skeleton-card"><div class="skeleton-thumb"></div><div class="skeleton-body"><div class="skeleton-line w80"></div><div class="skeleton-line w60"></div><div class="skeleton-line w40"></div></div></div>
+        </div>
+
         <!-- Empty State -->
         <div class="empty-state" id="emptyState" style="display: none;">
             <i class="fas fa-video-slash"></i>
             <h3>No videos found</h3>
             <p>Try adjusting your search or filters</p>
+            <button class="secondary-btn" id="reloadVideosBtn" type="button">Reload Videos</button>
         </div>
         </div>
 
@@ -236,11 +263,42 @@
                     </button>
                     <button class="action-btn dislike-btn" id="dislikeBtn">
                         <i class="fas fa-thumbs-down"></i>
+                        <span id="dislikeCount"></span>
                     </button>
-                    <button class="action-btn share-btn">
-                        <i class="fas fa-share"></i>
+                    <button class="action-btn share-btn" id="shareBtn">
+                        <i class="fas fa-share-alt"></i>
                         <span>Share</span>
                     </button>
+                    <button class="action-btn watch-later-btn" id="watchLaterBtn">
+                        <i class="fas fa-clock"></i>
+                        <span>Watch Later</span>
+                    </button>
+                    <button class="action-btn save-btn" id="savePlaylistBtn">
+                        <i class="fas fa-bookmark"></i>
+                        <span>Save</span>
+                    </button>
+                    <!-- Owner-only actions: Edit & Delete (shown inline for clarity) -->
+                    <button class="action-btn edit-video-btn" id="editVideoBtn" style="display:none" title="Edit video details">
+                        <i class="fas fa-pencil-alt"></i>
+                        <span>Edit</span>
+                    </button>
+                    <button class="action-btn delete-video-btn" id="deleteVideoBtn" style="display:none" title="Delete this video">
+                        <i class="fas fa-trash-alt"></i>
+                        <span>Delete</span>
+                    </button>
+                    <div class="action-more-wrap">
+                        <button class="action-btn more-btn" id="moreActionsBtn">
+                            <i class="fas fa-ellipsis-h"></i>
+                        </button>
+                        <div class="more-actions-menu" id="moreActionsMenu">
+                            <button class="more-action-item" id="reportBtn">
+                                <i class="fas fa-flag"></i> Report Video
+                            </button>
+                            <button class="more-action-item" id="downloadBtn">
+                                <i class="fas fa-download"></i> Download
+                            </button>
+                        </div>
+                    </div>
                 </div>
                 <div class="channel-info">
                     <div class="channel-avatar">
@@ -285,34 +343,56 @@
             <button class="modal-close" id="uploadModalClose">
                 <i class="fas fa-times"></i>
             </button>
-            <h2>Upload Video</h2>
+            <h2><i class="fas fa-cloud-upload-alt" style="color:var(--primary);margin-right:10px"></i>Upload Video</h2>
             <form id="uploadForm">
+                <!-- Upload Zone -->
                 <div class="upload-zone" id="uploadZone">
-                    <i class="fas fa-cloud-upload-alt"></i>
-                    <p>Drag and drop your video here</p>
-                    <span>or</span>
-                    <button type="button" class="browse-btn">Browse Files</button>
+                    <i class="fas fa-cloud-upload-alt upload-zone-icon"></i>
+                    <p id="uploadZoneText">Drag and drop your video here</p>
+                    <span class="upload-zone-or">or</span>
+                    <button type="button" class="browse-btn" id="browseBtn">Browse Files</button>
                     <input type="file" id="videoFile" accept="video/*" hidden>
                 </div>
+                <!-- File Preview Area (shown after file selected) -->
+                <div class="upload-file-preview" id="uploadFilePreview" style="display:none;">
+                    <div class="upload-file-info">
+                        <div class="upload-file-icon">
+                            <i class="fas fa-film"></i>
+                        </div>
+                        <div class="upload-file-details">
+                            <span class="upload-file-name" id="uploadFileName">video.mp4</span>
+                            <span class="upload-file-size" id="uploadFileSize">0 MB</span>
+                        </div>
+                        <button type="button" class="upload-delete-btn danger-btn" id="uploadDeleteBtn" title="Remove selected video">
+                            <i class="fas fa-trash-alt"></i>
+                            <span>Remove Video</span>
+                        </button>
+                    </div>
+                    <!-- Thumbnail Preview (generated from video) -->
+                    <div class="upload-thumb-wrap" id="uploadThumbWrap" style="display:none;">
+                        <canvas id="uploadThumbCanvas" class="upload-thumb-canvas"></canvas>
+                        <span class="upload-thumb-label"><i class="fas fa-image"></i> Auto-generated thumbnail</span>
+                    </div>
+                </div>
                 <div class="form-group">
-                    <label for="videoTitle">Title</label>
-                    <input type="text" id="videoTitle" placeholder="Enter video title" required>
+                    <label for="videoTitle">Title <span style="color:var(--primary)">*</span></label>
+                    <input type="text" id="videoTitle" placeholder="Give your video a catchy title" required>
                 </div>
                 <div class="form-group">
                     <label for="videoDescription">Description</label>
-                    <textarea id="videoDescription" placeholder="Describe your video" rows="4"></textarea>
+                    <textarea id="videoDescription" placeholder="Tell viewers what your video is about..." rows="4"></textarea>
                 </div>
                 <div class="form-group">
-                    <label for="videoGenre">Genre</label>
+                    <label for="videoGenre">Genre <span style="color:var(--primary)">*</span></label>
                     <select id="videoGenre" required>
                         <option value="">Select a genre</option>
-                        <option value="drama">Drama</option>
-                        <option value="comedy">Comedy</option>
-                        <option value="action">Action</option>
-                        <option value="romance">Romance</option>
-                        <option value="horror">Horror</option>
-                        <option value="documentary">Documentary</option>
-                        <option value="auditions">Auditions</option>
+                        <option value="drama">🎭 Drama</option>
+                        <option value="comedy">😂 Comedy</option>
+                        <option value="action">💥 Action</option>
+                        <option value="romance">❤️ Romance</option>
+                        <option value="horror">💀 Horror</option>
+                        <option value="documentary">🎬 Documentary</option>
+                        <option value="auditions">🎤 Auditions</option>
                     </select>
                 </div>
                 <div class="upload-progress" id="uploadProgress" style="display: none;">
@@ -321,7 +401,14 @@
                     </div>
                     <span class="progress-text" id="progressText">Uploading... 0%</span>
                 </div>
-                <button type="submit" class="submit-btn">Upload Video</button>
+                <div class="upload-actions">
+                    <button type="button" class="secondary-btn" id="uploadCancelBtn">
+                        <i class="fas fa-times"></i> Cancel
+                    </button>
+                    <button type="submit" class="submit-btn" id="uploadSubmitBtn">
+                        <i class="fas fa-upload"></i> Upload Video
+                    </button>
+                </div>
             </form>
         </div>
     </div>
@@ -476,6 +563,33 @@
             </a>
         </nav>
     </div>
+    <button class="back-to-top" id="backToTopBtn" type="button" aria-label="Back to top">
+        <i class="fas fa-arrow-up"></i>
+    </button>
+
+    <!-- Mobile Bottom Navigation (visible on phones only via CSS) -->
+    <nav class="mobile-bottom-nav" id="mobileBottomNav" aria-label="Mobile navigation">
+        <a href="#" id="mobNavHome" class="active" aria-label="Home">
+            <i class="fas fa-home"></i>
+            <span class="mob-nav-label">Home</span>
+        </a>
+        <button id="mobNavSearch" aria-label="Search">
+            <i class="fas fa-search"></i>
+            <span class="mob-nav-label">Search</span>
+        </button>
+        <button id="mobNavUpload" aria-label="Upload">
+            <i class="fas fa-plus-circle"></i>
+            <span class="mob-nav-label">Upload</span>
+        </button>
+        <button id="mobNavNotif" aria-label="Notifications">
+            <i class="fas fa-bell"></i>
+            <span class="mob-nav-label">Alerts</span>
+        </button>
+        <button id="mobNavMenu" aria-label="Menu">
+            <i class="fas fa-bars"></i>
+            <span class="mob-nav-label">Menu</span>
+        </button>
+    </nav>
 
     <!-- Footer -->
     <footer class="footer">

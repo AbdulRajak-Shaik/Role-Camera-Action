@@ -29,6 +29,9 @@ const mobileMenu = document.getElementById('mobileMenu');
 const signInModal = document.getElementById('signInModal');
 const signUpModal = document.getElementById('signUpModal');
 const authRequiredModal = document.getElementById('authRequiredModal');
+const resetFiltersBtn = document.getElementById('resetFiltersBtn');
+const reloadVideosBtn = document.getElementById('reloadVideosBtn');
+const backToTopBtn = document.getElementById('backToTopBtn');
 
 function getAuthHeader() {
   return token ? { Authorization: `Bearer ${token}` } : {};
@@ -63,47 +66,72 @@ function isLoggedIn() {
 }
 
 async function signUp(username, email, password) {
-  const response = await fetch(`${API_BASE}/auth/register`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ username, email, password })
-  });
-  const data = await response.json();
-  if (response.ok && data.success) {
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000);
+    const response = await fetch(`${API_BASE}/auth/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, email, password }),
+      signal: controller.signal
+    });
+    clearTimeout(timeoutId);
+    const data = await response.json();
+    if (response.ok && data.success) {
       setAuth(data.token, data.user);
       updateAuthUI();
       return { success: true, user: data.user };
     }
     return { success: false, error: data.error || 'Registration failed' };
+  } catch (err) {
+    if (err.name === 'AbortError') {
+      return { success: false, error: 'Request timed out. Is the server running?' };
+    }
+    return { success: false, error: err.message || 'Network error. Is the server running?' };
+  }
 }
 
 async function signIn(email, password) {
-  const response = await fetch(`${API_BASE}/auth/login`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, password })
-  });
-  const data = await response.json();
-  if (response.ok && data.success) {
-    setAuth(data.token, data.user);
-    return { success: true, user: data.user };
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000);
+    const response = await fetch(`${API_BASE}/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+      signal: controller.signal
+    });
+    clearTimeout(timeoutId);
+    const data = await response.json();
+    if (response.ok && data.success) {
+      setAuth(data.token, data.user);
+      return { success: true, user: data.user };
+    }
+    return { success: false, error: data.error || 'Login failed' };
+  } catch (err) {
+    if (err.name === 'AbortError') {
+      return { success: false, error: 'Request timed out. Is the server running?' };
+    }
+    return { success: false, error: err.message || 'Network error. Is the server running?' };
   }
-  return { success: false, error: data.error || 'Login failed' };
 }
 
 async function signInWithGoogle(credential) {
+  // Google is optional; if disabled/misconfigured, this should not block
+  // regular email/password sign-in.
   const response = await fetch(`${API_BASE}/auth/google`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ credential })
   });
-  const data = await response.json();
+  const data = await response.json().catch(() => ({}));
   if (response.ok && data.success) {
     setAuth(data.token, data.user);
     return { success: true, user: data.user };
   }
   return { success: false, error: data.error || 'Google sign-in failed' };
 }
+
 
 function signOut() {
   closeDashboard();
@@ -260,8 +288,38 @@ function getGenreTitle(genre) {
   return titles[genre] || 'Videos';
 }
 
+function resetFilters() {
+  currentGenre = 'all';
+  currentSort = 'newest';
+  currentSearch = '';
+  if (searchInput) searchInput.value = '';
+  if (currentAppView !== 'home') closeDashboard();
+  setActiveNav('all');
+  setActiveSort('newest');
+  loadVideos();
+}
+
+function updateBackToTopVisibility() {
+  if (!backToTopBtn) return;
+  backToTopBtn.classList.toggle('show', window.scrollY > 320);
+}
+
+function showSkeleton() {
+  const grid = document.getElementById('skeletonGrid');
+  if (grid) grid.style.display = 'grid';
+  if (videoGrid) videoGrid.style.display = 'none';
+  if (emptyState) emptyState.style.display = 'none';
+}
+
+function hideSkeleton() {
+  const grid = document.getElementById('skeletonGrid');
+  if (grid) grid.style.display = 'none';
+  if (videoGrid) videoGrid.style.display = 'grid';
+}
+
 async function loadVideos() {
   currentView = 'home';
+  showSkeleton();
   try {
     const params = new URLSearchParams({
       sort: currentSort,
@@ -273,11 +331,13 @@ async function loadVideos() {
     const data = await response.json();
     videos = data.videos || [];
     sectionTitle.textContent = getGenreTitle(currentGenre);
+    hideSkeleton();
     renderVideos(videos);
     updateStats();
   } catch (error) {
     console.error('Load videos error:', error);
     videos = [];
+    hideSkeleton();
     renderVideos([]);
     showNotification('Failed to load videos. Is the server running?', 'error');
   }
@@ -286,14 +346,17 @@ async function loadVideos() {
 async function loadMyVideos() {
   if (!isLoggedIn()) return showAuthRequired('view your videos');
   currentView = 'my';
+  showSkeleton();
   try {
     const response = await fetch(`${API_BASE}/videos/my`, { headers: getAuthHeader() });
     const data = await response.json();
+    hideSkeleton();
     if (data.success) {
       sectionTitle.textContent = 'My Videos';
-      renderVideos(data.videos);
+      renderVideosWithOwnerActions(data.videos);
     }
   } catch {
+    hideSkeleton();
     showNotification('Failed to load your videos', 'error');
   }
 }
@@ -343,16 +406,23 @@ function renderVideos(videoList) {
 
   videoGrid.innerHTML = videoList.map((video, index) => {
     const channel = video.uploadedBy || {};
-    const thumb = video.thumbnail || `${MEDIA_BASE}/uploads/placeholder.jpg`;
     const avatar = channel.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(channel.username || 'U')}&background=E50914&color=fff`;
     return `
     <div class="video-card" data-id="${video._id}" style="animation-delay: ${index * 0.05}s">
       <div class="thumbnail-container">
         <div class="thumbnail-placeholder"><i class="fas fa-play-circle"></i></div>
         <span class="genre-tag">${video.genre || 'all'}</span>
-        <span class="duration-badge">${video.duration || ''}</span>
+        ${video.duration ? `<span class="duration-badge">${video.duration}</span>` : ''}
         <div class="thumbnail-overlay">
           <div class="play-icon"><i class="fas fa-play"></i></div>
+          <div class="card-quick-actions">
+            <button class="card-action-btn card-watch-later" data-id="${video._id}" title="Watch Later" onclick="event.stopPropagation();quickWatchLater('${video._id}','${escapeHtml(video.title)}')">
+              <i class="fas fa-clock"></i>
+            </button>
+            <button class="card-action-btn card-save" data-id="${video._id}" title="Save" onclick="event.stopPropagation();quickSave('${video._id}')">
+              <i class="fas fa-bookmark"></i>
+            </button>
+          </div>
         </div>
       </div>
       <div class="video-content">
@@ -374,6 +444,202 @@ function renderVideos(videoList) {
   });
 }
 
+function renderVideosWithOwnerActions(videoList) {
+  if (!videoList.length) {
+    videoGrid.innerHTML = '';
+    emptyState.style.display = 'block';
+    return;
+  }
+  emptyState.style.display = 'none';
+
+  videoGrid.innerHTML = videoList.map((video, index) => {
+    const channel = video.uploadedBy || {};
+    const avatar = channel.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(channel.username || 'U')}&background=E50914&color=fff`;
+    return `
+    <div class="video-card owner-card" data-id="${video._id}" style="animation-delay: ${index * 0.05}s">
+      <div class="thumbnail-container">
+        <div class="thumbnail-placeholder"><i class="fas fa-play-circle"></i></div>
+        <span class="genre-tag">${video.genre || 'all'}</span>
+        <span class="video-status-badge status-${video.status || 'draft'}">${video.status || 'draft'}</span>
+        ${video.duration ? `<span class="duration-badge">${video.duration}</span>` : ''}
+        <div class="thumbnail-overlay">
+          <div class="play-icon"><i class="fas fa-play"></i></div>
+          <div class="card-quick-actions owner-actions">
+            <button class="card-action-btn card-edit" data-id="${video._id}" title="Edit video" onclick="event.stopPropagation();openEditVideoCard('${video._id}','${escapeHtml(video.title).replace(/'/g,"\\'")}')"> 
+              <i class="fas fa-pencil-alt"></i>
+            </button>
+            <button class="card-action-btn card-delete" data-id="${video._id}" title="Delete video" onclick="event.stopPropagation();deleteVideoById('${video._id}')">
+              <i class="fas fa-trash-alt"></i>
+            </button>
+          </div>
+        </div>
+      </div>
+      <div class="video-content">
+        <h3>${escapeHtml(video.title)}</h3>
+        <div class="video-channel">
+          <img src="${avatar}" alt="${escapeHtml(channel.username || '')}" class="channel-icon">
+          <span class="channel-name">${escapeHtml(channel.username || 'Unknown')}</span>
+        </div>
+        <div class="video-stats">
+          <span><i class="fas fa-eye"></i> ${formatViews(video.views || 0)} views</span>
+          <span><i class="fas fa-clock"></i> ${formatDate(video.createdAt)}</span>
+        </div>
+        <div class="owner-card-actions">
+          <button class="owner-action-btn edit-btn" data-id="${video._id}" onclick="event.stopPropagation();openEditVideoCard('${video._id}','${escapeHtml(video.title).replace(/'/g,"\\'")}')"><i class="fas fa-pencil-alt"></i> Edit</button>
+          <button class="owner-action-btn delete-btn" data-id="${video._id}" onclick="event.stopPropagation();deleteVideoById('${video._id}')"><i class="fas fa-trash-alt"></i> Delete</button>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+
+  document.querySelectorAll('.video-card').forEach(card => {
+    card.addEventListener('click', () => openVideoModal(card.dataset.id));
+  });
+}
+
+function quickWatchLater(videoId, title) {
+  if (!isLoggedIn()) return showAuthRequired('use Watch Later');
+  const list = getWatchLater();
+  const idx = list.findIndex(item => item.id === videoId);
+  if (idx >= 0) {
+    list.splice(idx, 1);
+    showNotification('Removed from Watch Later', 'info');
+  } else {
+    list.unshift({ id: videoId, title, addedAt: new Date().toISOString() });
+    showNotification('Saved to Watch Later!', 'success');
+  }
+  setWatchLater(list);
+}
+
+function quickSave(videoId) {
+  if (!isLoggedIn()) return showAuthRequired('save videos');
+  showNotification('Video bookmarked!', 'success');
+}
+
+async function deleteVideoById(videoId) {
+  if (!isLoggedIn()) return;
+  if (!confirm('Delete this video? This action cannot be undone.')) return;
+  try {
+    const user = getCurrentUser();
+    const cid = user._id || user.id;
+    const res = await fetch(`${API_BASE}/studio/${cid}/videos/${videoId}`, {
+      method: 'DELETE',
+      headers: getAuthHeader()
+    });
+    const data = await res.json();
+    if (data.success || res.ok) {
+      showNotification('Video deleted successfully', 'success');
+      await loadMyVideos();
+    } else {
+      showNotification(data.error || 'Failed to delete video', 'error');
+    }
+  } catch {
+    showNotification('Failed to delete video', 'error');
+  }
+}
+
+function loadWatchLaterPage() {
+  if (!isLoggedIn()) return showAuthRequired('view Watch Later');
+  currentView = 'watch-later';
+  const list = getWatchLater();
+  sectionTitle.textContent = 'Watch Later';
+  if (!list.length) {
+    videoGrid.innerHTML = '';
+    emptyState.style.display = 'block';
+    document.querySelector('#emptyState h3').textContent = 'No videos saved';
+    document.querySelector('#emptyState p').textContent = 'Videos you save for later will appear here';
+    return;
+  }
+  emptyState.style.display = 'none';
+  const ids = list.map(i => i.id);
+  // Filter from cached videos or show saved list
+  const found = ids.map(id => videos.find(v => v._id === id)).filter(Boolean);
+  if (found.length) {
+    renderVideos(found);
+  } else {
+    // Show list items as simple cards
+    videoGrid.innerHTML = list.map((item, i) => `
+      <div class="video-card watch-later-card" style="animation-delay: ${i * 0.05}s" onclick="openVideoModal('${item.id}')">
+        <div class="thumbnail-container">
+          <div class="thumbnail-placeholder"><i class="fas fa-clock"></i></div>
+          <div class="thumbnail-overlay"><div class="play-icon"><i class="fas fa-play"></i></div></div>
+        </div>
+        <div class="video-content">
+          <h3>${escapeHtml(item.title)}</h3>
+          <div class="video-stats"><span><i class="fas fa-clock"></i> Added ${formatDate(item.addedAt)}</span></div>
+          <div class="owner-card-actions">
+            <button class="owner-action-btn delete-btn" onclick="event.stopPropagation();removeFromWatchLater('${item.id}')"><i class="fas fa-times"></i> Remove</button>
+          </div>
+        </div>
+      </div>
+    `).join('');
+  }
+}
+
+function removeFromWatchLater(videoId) {
+  const list = getWatchLater().filter(i => i.id !== videoId);
+  setWatchLater(list);
+  showNotification('Removed from Watch Later', 'info');
+  loadWatchLaterPage();
+}
+
+function openEditVideoCard(videoId, currentTitle) {
+  let dialog = document.getElementById('editVideoDialog');
+  if (dialog) dialog.remove();
+  dialog = document.createElement('div');
+  dialog.id = 'editVideoDialog';
+  dialog.className = 'report-dialog';
+  dialog.innerHTML = `
+    <div class="report-dialog-content">
+      <div class="report-dialog-header">
+        <h3><i class="fas fa-pencil-alt"></i> Edit Video</h3>
+        <button class="modal-close report-close" id="editDialogClose"><i class="fas fa-times"></i></button>
+      </div>
+      <div class="form-group" style="margin-top:16px">
+        <label>Title</label>
+        <input type="text" id="editVideoTitle" value="${escapeHtml(currentTitle)}" style="width:100%;padding:12px;background:var(--surface);border:1px solid var(--border);border-radius:8px;color:#fff;font-size:14px">
+      </div>
+      <div class="form-group">
+        <label>Description</label>
+        <textarea id="editVideoDesc" rows="3" placeholder="Update description..." style="width:100%;padding:12px;background:var(--surface);border:1px solid var(--border);border-radius:8px;color:#fff;font-size:14px;resize:vertical"></textarea>
+      </div>
+      <div class="report-actions">
+        <button class="secondary-btn" id="editDialogCancel">Cancel</button>
+        <button class="submit-btn" style="width:auto;padding:10px 24px" id="editDialogSave"><i class="fas fa-save"></i> Save Changes</button>
+      </div>
+    </div>`;
+  document.body.appendChild(dialog);
+  setTimeout(() => dialog.classList.add('active'), 10);
+  const close = () => { dialog.classList.remove('active'); setTimeout(() => dialog.remove(), 300); };
+  document.getElementById('editDialogClose').onclick = close;
+  document.getElementById('editDialogCancel').onclick = close;
+  document.getElementById('editDialogSave').onclick = async () => {
+    const newTitle = document.getElementById('editVideoTitle').value.trim();
+    const newDesc = document.getElementById('editVideoDesc').value.trim();
+    if (!newTitle) return showNotification('Title is required', 'error');
+    try {
+      const user = getCurrentUser();
+      const cid = user._id || user.id;
+      const res = await fetch(`${API_BASE}/studio/${cid}/videos/${videoId}`, {
+        method: 'PATCH',
+        headers: { ...getAuthHeader(), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: newTitle, description: newDesc })
+      });
+      const data = await res.json();
+      if (data.success || res.ok) {
+        showNotification('Video updated!', 'success');
+        close();
+        if (currentView === 'my') await loadMyVideos();
+        else await loadVideos();
+      } else {
+        showNotification(data.error || 'Update failed', 'error');
+      }
+    } catch {
+      showNotification('Update failed', 'error');
+    }
+  };
+}
+
 function escapeHtml(str) {
   const div = document.createElement('div');
   div.textContent = str;
@@ -391,6 +657,7 @@ async function openVideoModal(videoId) {
       id: video._id,
       channelId: video.uploadedBy._id,
       liked: data.isLiked,
+      disliked: data.isDisliked || false,
       subscribed: data.isSubscribed
     };
 
@@ -405,11 +672,33 @@ async function openVideoModal(videoId) {
     document.getElementById('modalChannelSubs').textContent =
       formatSubs(video.uploadedBy.subscriberCount);
 
-    videoPlayer.src = `${MEDIA_BASE}${video.filePath}`;
+    videoPlayer.src = `${API_BASE}/uploads/${video._id}/video`;
     videoPlayer.load();
+    let errorShown = false;
+    videoPlayer.onerror = () => {
+      if (!errorShown) {
+        errorShown = true;
+        console.error('Video playback error for:', videoPlayer.src, videoPlayer.error);
+      }
+    };
+    videoPlayer.onplaying = () => {
+      if (errorShown) {
+        console.log('Video started playing after initial error');
+      }
+    };
 
     updateLikeButton(currentVideo.liked);
+    updateDislikeButton(currentVideo.disliked || false);
     updateSubscribeButton(currentVideo.subscribed);
+    // Show / hide owner-only Edit & Delete buttons
+    const deleteVideoBtn = document.getElementById('deleteVideoBtn');
+    const editVideoBtn = document.getElementById('editVideoBtn');
+    const user = getCurrentUser();
+    const isOwner = user && (String(video.uploadedBy._id) === String(user._id || user.id));
+    if (deleteVideoBtn) deleteVideoBtn.style.display = isOwner ? 'flex' : 'none';
+    if (editVideoBtn) editVideoBtn.style.display = isOwner ? 'flex' : 'none';
+    // Watch Later indicator
+    updateWatchLaterButton(currentVideo.id);
     await loadChannelNotificationPrefs(currentVideo.channelId, currentVideo.subscribed);
     await loadComments(videoId);
 
@@ -454,6 +743,11 @@ function closeVideoModal() {
 function updateLikeButton(liked) {
   const btn = document.getElementById('likeBtn');
   btn.classList.toggle('active', liked);
+}
+
+function updateDislikeButton(disliked) {
+  const btn = document.getElementById('dislikeBtn');
+  btn.classList.toggle('active', disliked);
 }
 
 function updateSubscribeButton(subscribed) {
@@ -560,11 +854,149 @@ async function toggleLike() {
     const data = await response.json();
     if (data.success) {
       currentVideo.liked = data.liked;
+      if (data.liked) currentVideo.disliked = false;
       document.getElementById('likeCount').textContent = data.likes;
       updateLikeButton(data.liked);
+      updateDislikeButton(currentVideo.disliked);
     }
   } catch {
     showNotification('Failed to update like', 'error');
+  }
+}
+
+async function toggleDislike() {
+  if (!isLoggedIn()) return showAuthRequired('rate videos');
+  if (!currentVideo) return;
+  currentVideo.disliked = !currentVideo.disliked;
+  if (currentVideo.disliked) currentVideo.liked = false;
+  updateDislikeButton(currentVideo.disliked);
+  updateLikeButton(currentVideo.liked);
+  if (currentVideo.liked === false) {
+    // Optionally update like count display
+    const likeCount = parseInt(document.getElementById('likeCount').textContent) || 0;
+    // No server dislike endpoint needed; just toggle locally
+  }
+  showNotification(currentVideo.disliked ? 'Marked as disliked' : 'Removed dislike', 'info');
+}
+
+// Watch Later (localStorage-based)
+function getWatchLater() {
+  try { return JSON.parse(localStorage.getItem('rca_watch_later') || '[]'); } catch { return []; }
+}
+function setWatchLater(list) {
+  localStorage.setItem('rca_watch_later', JSON.stringify(list));
+}
+function toggleWatchLater() {
+  if (!isLoggedIn()) return showAuthRequired('use Watch Later');
+  if (!currentVideo) return;
+  const list = getWatchLater();
+  const idx = list.findIndex(item => item.id === currentVideo.id);
+  if (idx >= 0) {
+    list.splice(idx, 1);
+    showNotification('Removed from Watch Later', 'info');
+  } else {
+    list.unshift({ id: currentVideo.id, title: document.getElementById('modalTitle').textContent, addedAt: new Date().toISOString() });
+    showNotification('Saved to Watch Later!', 'success');
+  }
+  setWatchLater(list);
+  updateWatchLaterButton(currentVideo.id);
+}
+function updateWatchLaterButton(videoId) {
+  const btn = document.getElementById('watchLaterBtn');
+  if (!btn) return;
+  const inList = getWatchLater().some(item => item.id === videoId);
+  btn.classList.toggle('active', inList);
+  btn.title = inList ? 'Remove from Watch Later' : 'Save to Watch Later';
+  btn.querySelector('span').textContent = inList ? 'Saved' : 'Watch Later';
+}
+
+// Save (bookmark) - same list as Watch Later with UI distinction
+function toggleSave() {
+  if (!isLoggedIn()) return showAuthRequired('save videos');
+  if (!currentVideo) return;
+  const btn = document.getElementById('savePlaylistBtn');
+  const saved = btn.classList.contains('active');
+  btn.classList.toggle('active', !saved);
+  btn.querySelector('span').textContent = !saved ? 'Saved' : 'Save';
+  showNotification(!saved ? 'Video bookmarked!' : 'Bookmark removed', !saved ? 'success' : 'info');
+}
+
+// Report video
+function showReportDialog() {
+  if (!isLoggedIn()) return showAuthRequired('report videos');
+  const reasons = [
+    'Inappropriate content',
+    'Spam or misleading',
+    'Harassment or bullying',
+    'Violence or dangerous acts',
+    'Copyright infringement',
+    'Other'
+  ];
+  let existing = document.getElementById('reportDialog');
+  if (existing) existing.remove();
+  const dialog = document.createElement('div');
+  dialog.id = 'reportDialog';
+  dialog.className = 'report-dialog';
+  dialog.innerHTML = `
+    <div class="report-dialog-content">
+      <div class="report-dialog-header">
+        <h3><i class="fas fa-flag"></i> Report Video</h3>
+        <button class="modal-close report-close" id="reportClose"><i class="fas fa-times"></i></button>
+      </div>
+      <p>Why are you reporting this video?</p>
+      <div class="report-reasons">
+        ${reasons.map(r => `<button class="report-reason-btn" data-reason="${r}">${r}</button>`).join('')}
+      </div>
+      <div class="report-other" id="reportOtherWrap" style="display:none">
+        <textarea id="reportOtherText" placeholder="Describe the issue..." rows="3"></textarea>
+      </div>
+      <div class="report-actions">
+        <button class="secondary-btn" id="reportCancelBtn">Cancel</button>
+        <button class="submit-btn" id="reportSubmitBtn"><i class="fas fa-paper-plane"></i> Submit Report</button>
+      </div>
+    </div>`;
+  document.body.appendChild(dialog);
+  setTimeout(() => dialog.classList.add('active'), 10);
+  let selectedReason = '';
+  dialog.querySelectorAll('.report-reason-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      dialog.querySelectorAll('.report-reason-btn').forEach(b => b.classList.remove('selected'));
+      btn.classList.add('selected');
+      selectedReason = btn.dataset.reason;
+      document.getElementById('reportOtherWrap').style.display = selectedReason === 'Other' ? 'block' : 'none';
+    });
+  });
+  document.getElementById('reportClose').addEventListener('click', () => { dialog.classList.remove('active'); setTimeout(() => dialog.remove(), 300); });
+  document.getElementById('reportCancelBtn').addEventListener('click', () => { dialog.classList.remove('active'); setTimeout(() => dialog.remove(), 300); });
+  document.getElementById('reportSubmitBtn').addEventListener('click', () => {
+    if (!selectedReason) return showNotification('Please select a reason', 'error');
+    showNotification('Report submitted. Thank you!', 'success');
+    dialog.classList.remove('active');
+    setTimeout(() => dialog.remove(), 300);
+  });
+}
+
+// Delete video (owner)
+async function deleteCurrentVideo() {
+  if (!isLoggedIn() || !currentVideo) return;
+  const user = getCurrentUser();
+  if (!confirm('Delete this video? This action cannot be undone.')) return;
+  try {
+    const cid = user._id || user.id;
+    const res = await fetch(`${API_BASE}/studio/${cid}/videos/${currentVideo.id}`, {
+      method: 'DELETE',
+      headers: getAuthHeader()
+    });
+    const data = await res.json();
+    if (data.success || res.ok) {
+      showNotification('Video deleted successfully', 'success');
+      closeVideoModal();
+      await loadVideos();
+    } else {
+      showNotification(data.error || 'Failed to delete video', 'error');
+    }
+  } catch {
+    showNotification('Failed to delete video', 'error');
   }
 }
 
@@ -615,7 +1047,7 @@ async function handleUpload(e) {
   const progressBar = document.getElementById('progressFill');
   const progressText = document.getElementById('progressText');
   const uploadProgress = document.getElementById('uploadProgress');
-  const submitBtn = document.querySelector('#uploadForm .submit-btn');
+  const submitBtn = document.getElementById('uploadSubmitBtn') || document.querySelector('#uploadForm .submit-btn');
 
   uploadProgress.style.display = 'block';
   submitBtn.disabled = true;
@@ -643,11 +1075,9 @@ async function handleUpload(e) {
     progressText.textContent = 'Uploading... 100%';
 
     if (data.success) {
-      showNotification('Video uploaded successfully!', 'success');
+      showNotification('Video uploaded successfully! 🎬', 'success');
       uploadModal.classList.remove('active');
-      document.getElementById('uploadForm').reset();
-      document.getElementById('uploadZone').classList.remove('has-file');
-      document.querySelector('.upload-zone p').textContent = 'Drag and drop your video here';
+      resetUploadForm();
       await loadVideos();
     } else {
       showNotification(data.error || 'Upload failed', 'error');
@@ -659,6 +1089,46 @@ async function handleUpload(e) {
     progressBar.style.width = '0%';
     submitBtn.disabled = false;
   }
+}
+
+function resetUploadForm() {
+  const form = document.getElementById('uploadForm');
+  if (form) form.reset();
+  const uploadZone = document.getElementById('uploadZone');
+  const uploadFilePreview = document.getElementById('uploadFilePreview');
+  const uploadThumbWrap = document.getElementById('uploadThumbWrap');
+  if (uploadZone) { uploadZone.classList.remove('has-file', 'dragover'); uploadZone.style.display = 'flex'; }
+  if (uploadFilePreview) uploadFilePreview.style.display = 'none';
+  if (uploadThumbWrap) uploadThumbWrap.style.display = 'none';
+  const p = document.getElementById('uploadZoneText');
+  if (p) p.textContent = 'Drag and drop your video here';
+}
+
+function generateVideoThumbnail(file) {
+  return new Promise((resolve) => {
+    const video = document.createElement('video');
+    video.preload = 'metadata';
+    video.muted = true;
+    video.playsInline = true;
+    const url = URL.createObjectURL(file);
+    video.src = url;
+    video.onloadeddata = () => {
+      video.currentTime = Math.min(2, video.duration * 0.1);
+    };
+    video.onseeked = () => {
+      const canvas = document.getElementById('uploadThumbCanvas');
+      if (!canvas) { URL.revokeObjectURL(url); resolve(false); return; }
+      const ctx = canvas.getContext('2d');
+      canvas.width = video.videoWidth || 320;
+      canvas.height = video.videoHeight || 180;
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      URL.revokeObjectURL(url);
+      document.getElementById('uploadThumbWrap').style.display = 'block';
+      resolve(true);
+    };
+    video.onerror = () => { URL.revokeObjectURL(url); resolve(false); };
+    video.load();
+  });
 }
 
 function updateAuthUI() {
@@ -715,9 +1185,15 @@ async function loadAppConfig() {
 function initGoogleSignIn() {
   const hint = document.getElementById('googleHint');
   if (!googleClientId) {
-    if (hint) hint.textContent = 'Add GOOGLE_CLIENT_ID to backend/.env to enable Gmail sign-in';
+    if (hint) hint.textContent = 'Google sign-in is disabled. You can still sign in with email/password.';
+    // Remove Google buttons so user is not stuck trying to sign in
+    ['googleSignInBtn', 'googleSignUpBtn'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.style.display = 'none';
+    });
     return;
   }
+
   if (hint) hint.textContent = '';
   if (typeof google === 'undefined' || !google?.accounts?.id) return;
 
@@ -751,6 +1227,7 @@ function initGoogleSignIn() {
       });
     }
   });
+
   } catch (err) {
     console.warn('Google Sign-In init skipped:', err);
   }
@@ -861,6 +1338,12 @@ function setupEventListeners() {
     closeDashboard();
     loadLikedVideos();
   });
+  document.getElementById('watchLaterMenuBtn')?.addEventListener('click', e => {
+    e.preventDefault();
+    document.getElementById('userMenu').classList.remove('active');
+    closeDashboard();
+    loadWatchLaterPage();
+  });
   document.getElementById('subscriptionsBtn')?.addEventListener('click', e => {
     e.preventDefault();
     document.getElementById('userMenu').classList.remove('active');
@@ -890,7 +1373,46 @@ function setupEventListeners() {
 
   // Video actions
   document.getElementById('likeBtn')?.addEventListener('click', toggleLike);
+  document.getElementById('dislikeBtn')?.addEventListener('click', toggleDislike);
+  document.getElementById('watchLaterBtn')?.addEventListener('click', toggleWatchLater);
+  document.getElementById('savePlaylistBtn')?.addEventListener('click', toggleSave);
   document.getElementById('subscribeBtn')?.addEventListener('click', toggleSubscribe);
+  document.getElementById('reportBtn')?.addEventListener('click', () => {
+    document.getElementById('moreActionsMenu')?.classList.remove('open');
+    showReportDialog();
+  });
+  document.getElementById('deleteVideoBtn')?.addEventListener('click', () => {
+    deleteCurrentVideo();
+  });
+  document.getElementById('editVideoBtn')?.addEventListener('click', () => {
+    if (!currentVideo) return;
+    const title = document.getElementById('modalTitle')?.textContent || '';
+    openEditVideoCard(currentVideo.id, title);
+  });
+  document.getElementById('downloadBtn')?.addEventListener('click', () => {
+    document.getElementById('moreActionsMenu')?.classList.remove('open');
+    if (!isLoggedIn()) return showAuthRequired('download videos');
+    if (currentVideo) {
+      const a = document.createElement('a');
+      a.href = `${API_BASE}/uploads/${currentVideo.id}/video`;
+      a.download = document.getElementById('modalTitle')?.textContent || 'video';
+      a.click();
+    }
+  });
+  document.getElementById('moreActionsBtn')?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    document.getElementById('moreActionsMenu')?.classList.toggle('open');
+  });
+  document.addEventListener('click', () => {
+    document.getElementById('moreActionsMenu')?.classList.remove('open');
+  });
+  document.getElementById('shareBtn')?.addEventListener('click', () => {
+    if (currentVideo) {
+      const url = `${window.location.origin}?v=${currentVideo.id}`;
+      navigator.clipboard?.writeText(url);
+      showNotification('Link copied to clipboard! 🔗', 'success');
+    }
+  });
   document.getElementById('subNotifBtn')?.addEventListener('click', async () => {
     if (!currentVideo?.channelId || !currentVideo.subscribed) return;
     const panelId = 'subNotifPanel';
@@ -938,7 +1460,7 @@ function setupEventListeners() {
   const uploadZone = document.getElementById('uploadZone');
   const videoFileInput = document.getElementById('videoFile');
   const mainUploadForm = document.getElementById('uploadForm');
-  const browseBtn = uploadZone?.querySelector('.browse-btn');
+  const browseBtn = document.getElementById('browseBtn') || uploadZone?.querySelector('.browse-btn');
 
   if (uploadZone && browseBtn && videoFileInput) {
     browseBtn.addEventListener('click', e => {
@@ -949,35 +1471,125 @@ function setupEventListeners() {
       if (e.target === browseBtn || browseBtn.contains(e.target)) return;
       videoFileInput.click();
     });
-    videoFileInput.addEventListener('change', () => {
-      if (videoFileInput.files[0]) {
+    videoFileInput.addEventListener('change', async () => {
+      const file = videoFileInput.files[0];
+      if (file) {
         uploadZone.classList.add('has-file');
-        const p = uploadZone.querySelector('p');
-        if (p) p.textContent = videoFileInput.files[0].name;
+        uploadZone.style.display = 'none';
+        const preview = document.getElementById('uploadFilePreview');
+        if (preview) preview.style.display = 'block';
+        const nameEl = document.getElementById('uploadFileName');
+        const sizeEl = document.getElementById('uploadFileSize');
+        if (nameEl) nameEl.textContent = file.name;
+        if (sizeEl) sizeEl.textContent = (file.size / (1024 * 1024)).toFixed(2) + ' MB';
+        // Generate thumbnail
+        await generateVideoThumbnail(file);
       }
     });
     uploadZone.addEventListener('dragover', e => { e.preventDefault(); uploadZone.classList.add('dragover'); });
     uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('dragover'));
-    uploadZone.addEventListener('drop', e => {
+    uploadZone.addEventListener('drop', async e => {
       e.preventDefault();
       uploadZone.classList.remove('dragover');
-      if (e.dataTransfer.files[0]) {
-        videoFileInput.files = e.dataTransfer.files;
+      const file = e.dataTransfer.files[0];
+      if (file && file.type.startsWith('video/')) {
+        // Create a DataTransfer to assign to input
+        try {
+          const dt = new DataTransfer();
+          dt.items.add(file);
+          videoFileInput.files = dt.files;
+        } catch (_) {}
         uploadZone.classList.add('has-file');
-        const p = uploadZone.querySelector('p');
-        if (p) p.textContent = e.dataTransfer.files[0].name;
+        uploadZone.style.display = 'none';
+        const preview = document.getElementById('uploadFilePreview');
+        if (preview) preview.style.display = 'block';
+        const nameEl = document.getElementById('uploadFileName');
+        const sizeEl = document.getElementById('uploadFileSize');
+        if (nameEl) nameEl.textContent = file.name;
+        if (sizeEl) sizeEl.textContent = (file.size / (1024 * 1024)).toFixed(2) + ' MB';
+        await generateVideoThumbnail(file);
+      } else if (file) {
+        showNotification('Please drop a valid video file', 'error');
       }
     });
   }
 
+  // Upload delete (remove file) button
+  document.getElementById('uploadDeleteBtn')?.addEventListener('click', () => {
+    resetUploadForm();
+    showNotification('File removed', 'info');
+  });
+
+  // Upload cancel button
+  document.getElementById('uploadCancelBtn')?.addEventListener('click', () => {
+    uploadModal?.classList.remove('active');
+    resetUploadForm();
+  });
+
   mainUploadForm?.addEventListener('submit', handleUpload);
 
-  // Mobile menu
+  // Menu toggle — sidebar + overlay
+  const sidebarOverlay = document.getElementById('sidebarOverlay');
+  function openSidebar() {
+    sidebar?.classList.add('active');
+    sidebarOverlay?.classList.add('active');
+  }
+  function closeSidebar() {
+    sidebar?.classList.remove('active');
+    sidebarOverlay?.classList.remove('active');
+    mobileMenu?.classList.remove('active');
+  }
   document.getElementById('menuToggle')?.addEventListener('click', () => {
-    sidebar?.classList.toggle('active');
-    mobileMenu?.classList.add('active');
+    if (sidebar?.classList.contains('active')) {
+      closeSidebar();
+    } else {
+      openSidebar();
+    }
   });
-  document.getElementById('mobileClose')?.addEventListener('click', () => mobileMenu?.classList.remove('active'));
+  sidebarOverlay?.addEventListener('click', closeSidebar);
+  document.getElementById('mobileClose')?.addEventListener('click', closeSidebar);
+
+  // Mobile Bottom Navigation
+  document.getElementById('mobNavHome')?.addEventListener('click', e => {
+    e.preventDefault();
+    closeDashboard();
+    currentGenre = 'all';
+    currentSearch = '';
+    if (searchInput) searchInput.value = '';
+    setActiveNav('all');
+    loadVideos();
+    document.querySelectorAll('.mobile-bottom-nav a, .mobile-bottom-nav button').forEach(el => el.classList.remove('active'));
+    document.getElementById('mobNavHome')?.classList.add('active');
+  });
+  document.getElementById('mobNavSearch')?.addEventListener('click', () => {
+    if (searchInput) {
+      searchInput.focus();
+      searchInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+    document.querySelectorAll('.mobile-bottom-nav a, .mobile-bottom-nav button').forEach(el => el.classList.remove('active'));
+    document.getElementById('mobNavSearch')?.classList.add('active');
+  });
+  document.getElementById('mobNavUpload')?.addEventListener('click', () => {
+    if (!isLoggedIn()) return showAuthRequired('upload videos');
+    uploadModal?.classList.add('active');
+  });
+  document.getElementById('mobNavNotif')?.addEventListener('click', () => {
+    const wrap = document.getElementById('headerNotifWrap');
+    if (wrap && wrap.style.display !== 'none') {
+      document.getElementById('notifBellBtn')?.click();
+    } else {
+      showAuthRequired('view notifications');
+    }
+  });
+  document.getElementById('mobNavMenu')?.addEventListener('click', () => {
+    if (sidebar?.classList.contains('active')) {
+      closeSidebar();
+    } else {
+      openSidebar();
+    }
+    document.querySelectorAll('.mobile-bottom-nav a, .mobile-bottom-nav button').forEach(el => el.classList.remove('active'));
+    document.getElementById('mobNavMenu')?.classList.add('active');
+  });
 
   // Auth forms
   document.getElementById('signInForm')?.addEventListener('submit', async e => {

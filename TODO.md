@@ -1,10 +1,21 @@
-# TODO
+# TODO — Vercel serverless crash fixes
 
-- [ ] Verify which UI button(s) are not triggering (from screenshot)
-- [x] Inspect frontend JS to find event binding/routing logic
-- [x] Add temporary debug logger `_debug_check_buttons.js` and include it in `index.html`
-- [ ] Run site on localhost, open DevTools console, click the problematic button(s)
-- [ ] Copy the first console error (if any) and the `[RCA_DEBUG] clicked ...` lines
-- [ ] Apply minimal code fix based on observed error/behavior
-- [ ] Remove `_debug_check_buttons.js` from `index.html` after fix
+- [ ] Inspect Vercel routing + entrypoint correctness
+- [x] Remove server startup (`app.listen`) from serverless path
+
+- [x] Refactor Mongo connection to be serverless-safe (connect once, require MONGO_URI)
+
+- [x] Replace multer `diskStorage` with `memoryStorage` (videos + studio)
+
+- [x] Add/strengthen async + error handling (multer errors + jwt misconfig)
+
+- [x] Update `vercel.json` to use `@vercel/node` with correct routing to `api/index.js`
+
+- [x] Add debug console logs for Vercel logs (request traces, config presence)
+
+- [x] Verify required env vars are used correctly (MONGO_URI, JWT_SECRET, GOOGLE_CLIENT_ID)
+
+- [ ] Provide deployment instructions
+- [x] Final test plan for Vercel (health, auth, upload)
+
 

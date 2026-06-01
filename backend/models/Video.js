@@ -12,9 +12,10 @@ const videoSchema = new mongoose.Schema({
     trim: true,
     maxlength: [1000, 'Description cannot exceed 1000 characters']
   },
-  filePath: { type: String, required: [true, 'Video file path is required'] },
-  fileName: { type: String, required: true },
-  thumbnail: { type: String, default: '' },
+  videoData: { type: Buffer, required: true },
+  videoContentType: { type: String, required: true },
+  thumbnailData: { type: Buffer, required: true },
+  thumbnailContentType: { type: String, required: true },
   duration: { type: String, default: '0:00' },
   genre: {
     type: String,
@@ -37,5 +38,19 @@ const videoSchema = new mongoose.Schema({
 videoSchema.index({ genre: 1, createdAt: -1 });
 videoSchema.index({ status: 1, createdAt: -1 });
 videoSchema.index({ title: 'text', description: 'text' });
+
+// Virtual for video URL
+videoSchema.virtual('videoUrl').get(function() {
+  return `/api/uploads/${this._id}/video`;
+});
+
+// Virtual for thumbnail URL
+videoSchema.virtual('thumbnailUrl').get(function() {
+  return `/api/uploads/${this._id}/thumbnail`;
+});
+
+// Ensure virtuals are included when converting to JSON
+videoSchema.set('toJSON', { virtuals: true });
+videoSchema.set('toObject', { virtuals: true });
 
 module.exports = mongoose.model('Video', videoSchema);

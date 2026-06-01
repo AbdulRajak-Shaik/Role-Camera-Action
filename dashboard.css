@@ -182,8 +182,55 @@ body.dash-body {
 .status-unpublished { color: #a0a0a0; }
 
 @media (max-width: 768px) {
-  .dash-sidebar { display: none; }
   .dash-nav { display: none; }
+  .dash-layout {
+    flex-direction: column;
+  }
+  .dash-main {
+    padding: 16px;
+  }
+  .dash-sidebar {
+    width: 100%;
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    white-space: nowrap;
+    padding: 10px;
+    border-right: none;
+    border-bottom: 1px solid #2a2a2a;
+  }
+  .dash-sidebar a {
+    flex: 0 0 auto;
+    border: 1px solid #2a2a2a;
+    border-radius: 8px;
+    border-left: 1px solid #2a2a2a;
+    padding: 10px 12px;
+  }
+  .dash-sidebar a:hover,
+  .dash-sidebar a.active {
+    border-left: 1px solid #e50914;
+  }
+  .dash-panel {
+    overflow-x: auto;
+  }
+  .dash-table {
+    min-width: 640px;
+  }
+  .dash-header {
+    padding: 0 12px;
+  }
+  .dash-header-right span {
+    display: none;
+  }
+  .dash-embedded-header {
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .dash-embedded-layout .dash-sidebar {
+    position: static;
+    top: auto;
+    border-radius: 10px;
+  }
 }
 
 /* Embedded in main site */

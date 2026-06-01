@@ -15,23 +15,17 @@ const { logAction } = require('../services/auditService');
 
 const router = express.Router({ mergeParams: true });
 
-const uploadsDir = path.join(__dirname, '..', 'uploads', 'videos');
-const thumbDir = path.join(__dirname, '..', 'uploads', 'thumbnails');
-fs.mkdirSync(uploadsDir, { recursive: true });
-fs.mkdirSync(thumbDir, { recursive: true });
-
-const videoStorage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, uploadsDir),
-  filename: (req, file, cb) => cb(null, `${Date.now()}-${file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_')}`)
+// Vercel serverless: use memory storage to avoid writing to ephemeral disk.
+const uploadVideo = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 100 * 1024 * 1024 }
 });
 
-const thumbStorage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, thumbDir),
-  filename: (req, file, cb) => cb(null, `${Date.now()}-thumb-${file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_')}`)
+const uploadThumb = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 }
 });
 
-const uploadVideo = multer({ storage: videoStorage, limits: { fileSize: 100 * 1024 * 1024 } });
-const uploadThumb = multer({ storage: thumbStorage, limits: { fileSize: 5 * 1024 * 1024 } });
 
 router.use(protect);
 
@@ -88,7 +82,9 @@ router.post('/:channelId/videos', requirePermission('video.upload'), uploadVideo
       title,
       description: description || '',
       genre: genre || 'drama',
-      filePath: `/uploads/videos/${req.file.filename}`,
+      // Serverless: multer stores in memory; persist file buffers externally.
+      filePath: '',
+
       fileName: req.file.originalname,
       uploadedBy: req.params.channelId,
       channelId: req.params.channelId,
@@ -125,7 +121,9 @@ router.post('/:channelId/videos/:videoId/thumbnail', requirePermission('video.th
     const video = await Video.findOne({ _id: req.params.videoId, uploadedBy: req.params.channelId });
     if (!video) return res.status(404).json({ success: false, error: 'Not found' });
     if (req.file) {
-      video.thumbnail = `/uploads/thumbnails/${req.file.filename}`;
+      // Serverless: multer stores in memory; persist thumbnail buffer externally.
+      video.thumbnail = '';
+
       await video.save();
     }
     res.json({ success: true, video });

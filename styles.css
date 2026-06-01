@@ -298,6 +298,10 @@ img {
     min-height: calc(100vh - var(--header-height));
 }
 
+.main-content.sidebar-collapsed {
+    margin-left: 0;
+}
+
 /* Hero Section */
 .hero-section {
     background: linear-gradient(135deg, var(--secondary) 0%, #1a0a0a 100%);
@@ -386,9 +390,15 @@ img {
 .filter-options {
     display: flex;
     gap: 8px;
+    align-items: center;
+    flex-wrap: wrap;
+    justify-content: flex-end;
 }
 
 .filter-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
     padding: 8px 16px;
     border-radius: 20px;
     font-size: 13px;
@@ -408,6 +418,10 @@ img {
     background: var(--primary);
     border-color: var(--primary);
     color: var(--text-primary);
+}
+
+.filter-reset-btn {
+    background: transparent;
 }
 
 /* Video Grid */
@@ -436,10 +450,23 @@ img {
     opacity: 1;
 }
 
+.video-card:focus-visible {
+    outline: 2px solid var(--primary);
+    outline-offset: 2px;
+}
+
 .thumbnail-container {
     position: relative;
     aspect-ratio: 16 / 9;
     overflow: hidden;
+}
+
+.thumbnail-image {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
 }
 
 .thumbnail-container img {
@@ -572,6 +599,10 @@ img {
     font-size: 20px;
     margin-bottom: 8px;
     color: var(--text-primary);
+}
+
+.empty-state .secondary-btn {
+    margin-top: 16px;
 }
 
 /* ============================================
@@ -1084,6 +1115,10 @@ img {
     margin-left: var(--sidebar-width);
 }
 
+.footer.sidebar-collapsed {
+    margin-left: 0;
+}
+
 .footer-content {
     max-width: 1200px;
     margin: 0 auto;
@@ -1126,6 +1161,39 @@ img {
 
 .footer-links a:hover {
     color: var(--primary);
+}
+
+.back-to-top {
+    position: fixed;
+    right: 24px;
+    bottom: 24px;
+    width: 46px;
+    height: 46px;
+    border-radius: 50%;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text-primary);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(12px);
+    transition: var(--transition);
+    z-index: 1200;
+}
+
+.back-to-top:hover {
+    border-color: var(--primary);
+    background: var(--primary);
+}
+
+.back-to-top.show {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
 }
 
 /* ============================================
@@ -1198,36 +1266,89 @@ img {
     .related-list {
         grid-template-columns: 1fr;
     }
+
+    .header {
+        padding: 0 16px;
+    }
+
+    .header-center {
+        margin: 0 12px;
+        max-width: none;
+    }
+
+    .header-right {
+        gap: 10px;
+    }
 }
 
 @media (max-width: 768px) {
     .header {
-        padding: 0 16px;
+        padding: 0 12px;
+        gap: 8px;
     }
     
     .logo-text {
         display: none;
     }
+
+    .header-left {
+        gap: 10px;
+    }
     
     .header-center {
-        margin: 0 12px;
+        margin: 0 6px;
+        min-width: 0;
+    }
+
+    .search-container {
+        min-width: 0;
     }
     
     .search-input {
-        padding: 8px 12px;
+        min-width: 0;
+        padding: 8px 10px;
     }
     
     .search-btn {
-        padding: 8px 12px;
+        padding: 8px 10px;
+    }
+
+    .header-right {
+        gap: 8px;
+    }
+
+    .notif-bell-btn {
+        width: 38px;
+        height: 38px;
     }
     
-    .upload-btn span {
+    .upload-btn span,
+    .signin-btn span,
+    .user-menu-trigger .user-name,
+    .user-menu-trigger i {
         display: none;
     }
     
-    .upload-btn {
-        padding: 10px;
+    .upload-btn,
+    .signin-btn {
+        width: 38px;
+        height: 38px;
+        padding: 0;
         border-radius: 50%;
+        justify-content: center;
+    }
+
+    .user-menu-trigger {
+        width: 38px;
+        height: 38px;
+        padding: 0;
+        border-radius: 50%;
+        justify-content: center;
+    }
+
+    .user-menu-trigger img {
+        width: 30px;
+        height: 30px;
     }
     
     .hero-section {
@@ -1259,6 +1380,11 @@ img {
         flex-direction: column;
         align-items: flex-start;
         gap: 16px;
+    }
+
+    .filter-options {
+        width: 100%;
+        justify-content: flex-start;
     }
     
     .video-modal {
@@ -1314,6 +1440,30 @@ img {
     .upload-zone {
         padding: 32px 20px;
     }
+
+    .footer {
+        padding: 24px 16px;
+    }
+
+    .footer-links {
+        flex-wrap: wrap;
+        gap: 12px 18px;
+    }
+
+    .comment-form {
+        flex-direction: column;
+    }
+
+    .comment-form .submit-btn.small {
+        width: 100%;
+    }
+
+    .back-to-top {
+        right: 16px;
+        bottom: 16px;
+        width: 42px;
+        height: 42px;
+    }
 }
 
 @media (max-width: 480px) {
@@ -1335,6 +1485,46 @@ img {
     
     .filter-btn {
         white-space: nowrap;
+    }
+
+    .search-input::placeholder {
+        font-size: 12px;
+    }
+
+    .auth-required-actions {
+        flex-direction: column;
+    }
+
+    .auth-required-actions .submit-btn,
+    .auth-required-actions .secondary-btn {
+        width: 100%;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    html {
+        scroll-behavior: auto;
+    }
+
+    *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
+}
+
+@media (prefers-reduced-data: reduce) {
+    .header {
+        -webkit-backdrop-filter: none;
+        backdrop-filter: none;
+    }
+
+    .video-card:hover,
+    .upload-btn:hover,
+    .signin-btn:hover,
+    .submit-btn:hover {
+        transform: none;
+        box-shadow: none;
     }
 }
 
@@ -1879,15 +2069,29 @@ img {
 }
 
 .related-thumb {
+    position: relative;
     width: 120px;
     min-width: 120px;
     aspect-ratio: 16/9;
     background: var(--surface);
     border-radius: 8px;
+    overflow: hidden;
     display: flex;
     align-items: center;
     justify-content: center;
     color: var(--text-secondary);
+}
+
+.related-thumb img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.related-thumb img + i {
+    display: none;
 }
 
 .related-title {
